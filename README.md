@@ -24,7 +24,6 @@ NOTE: Changes to settings in an existing RawHex'ler tab will apply globally to a
 - **Space Delimiters**: Option to include or exclude space delimiters in the hex content for improved readability.
 - **UTF-8 Postfix Notation**: Enable or disable the display of UTF-8 encoded characters alongside the HEX data, aiding in the interpretation of human-readable text within the binary data.
   **Attention**: Carriage-return (`\r`) and newline (`\n`) characters are displayed as spaces in the UTF-8 postfix. This postfix data is read-only, meaning any modifications to it will not alter the actual content.
-- **Save Editor Content in Request**: Saves the current editor content to the request.
 - **Reformat Editor**: Resets the editor to the Burp hex formatting. 
    **Attention**: It does not save the current editor content in the request, you have to click save to actually save them to the request.
 - **hex-File to Clipboard**: Let'S you choose a file which will then be converted to hex, put into the clipboard and the put into search bar.
