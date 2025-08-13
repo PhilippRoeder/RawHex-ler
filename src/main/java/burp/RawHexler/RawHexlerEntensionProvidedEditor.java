@@ -17,6 +17,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.*;
+import java.nio.file.Files;
+
 
 import static burp.api.montoya.core.ByteArray.byteArray;
 
@@ -24,12 +27,17 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
     private final MontoyaApi api;
     private final RawHexlerHttpEditorProvider rawHexlerHttpEditorProvider;
     private RawEditor rawEditor;
+    private HttpRequest  editedRequest  = null;
+    private HttpResponse editedResponse = null;
     private HttpRequestResponse requestResponse;
-    private JMenuItem menuItemPrefixRow, menuItemSpaceDelim, menuItemUtf8Postfix;
+    private boolean dirtyCheck = false;
+
+    private JMenuItem menuItemPrefixRow, menuItemSpaceDelim, menuItemUtf8Postfix, menuItemAddFile, fileToSearch, refreshFormat, pasteClipboard;
 
     public RawHexlerEntensionProvidedEditor(MontoyaApi api, EditorCreationContext editorCreationContext, RawHexlerHttpEditorProvider rawHexlerHttpEditorProvider) {
         this.api = api;
         this.rawHexlerHttpEditorProvider = rawHexlerHttpEditorProvider;
+
 
         if (editorCreationContext.editorMode() == EditorMode.READ_ONLY)
         {
@@ -51,7 +59,10 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
                 }
             }
         });
+
     }
+
+
 
     private JPopupMenu createPopupMenu() {
         JPopupMenu popupMenu = new JPopupMenu();
@@ -62,6 +73,23 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
             refreshEditor();
         });
         popupMenu.add(menuItemPrefixRow);
+
+        fileToSearch = new JMenuItem("hex-File to Clipboard");
+        fileToSearch.addActionListener(e -> {
+            SwingUtilities.invokeLater(() -> {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Select a file to import");
+                chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                chooser.setDragEnabled(true);
+                int result = chooser.showOpenDialog(null);
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File selected = chooser.getSelectedFile();
+                    this.hexFileToClipboard(selected);
+
+                }
+            });
+        });
+        popupMenu.add(fileToSearch);
 
         menuItemSpaceDelim = new JMenuItem("Toggle Space Delimiters");
         menuItemSpaceDelim.addActionListener(e -> {
@@ -78,53 +106,84 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         });
         popupMenu.add(menuItemUtf8Postfix);
 
+        refreshFormat = new JMenuItem("Reformat Editor");
+        refreshFormat.addActionListener(e -> {
+            refreshEditor();
+        });
+        popupMenu.add(refreshFormat);
+
+
+        menuItemAddFile = new JMenuItem("Paste from hex File");
+        menuItemAddFile.addActionListener(e -> {
+            // Always invoke GUI code on the EDT for safety in Burp
+            SwingUtilities.invokeLater(() -> {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Select a file to import");
+                chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                chooser.setDragEnabled(true);        // enables drag‑and‑drop
+                int result = chooser.showOpenDialog(null); // parent can be Burp’s main frame
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File selected = chooser.getSelectedFile();
+                    this.addFileFromPath(selected); // overload takes File
+
+                }
+            });
+        });
+        popupMenu.add(menuItemAddFile);
+
+        pasteClipboard = new JMenuItem("Paste hex from Clipboard");
+        pasteClipboard.addActionListener(e -> {
+            this.pasteHex();
+
+        });
+        popupMenu.add(pasteClipboard);
+
+
+
         return popupMenu;
     }
 
+
+
     @Override
     public HttpRequest getRequest() {
-        HttpRequest request;
-        if (rawEditor.isModified())
-        {
-            try{
-                request = HttpRequest.httpRequest(byteArray(hexToBytes(rawEditor.getContents().toString())));
-            } catch (Exception e) {
-
-                request = requestResponse.request();
+        // If user edited, build from editor now
+        if (rawEditor.isModified() || dirtyCheck) {
+            try {
+                byte[] bytes = hexToBytes(rawEditor.getContents().toString());
+                // If you intend to replace the whole message, do this:
+                return HttpRequest.httpRequest(ByteArray.byteArray(bytes));
+                // If you only intend to replace the body, use requestResponse.request().withBody(...) instead.
+            } catch (Exception ex) {
+                api.logging().logToError("Invalid hex in editor: " + ex);
+                // Fall back to last good version:
+                return (editedRequest != null) ? editedRequest : requestResponse.request();
             }
-
-
-        }else
-        {
-            request = requestResponse.request();
         }
-
-        return request;
+        // Otherwise return last committed or original
+        return (editedRequest != null) ? editedRequest : requestResponse.request();
     }
 
     @Override
     public HttpResponse getResponse() {
-        HttpResponse response;
-        if (rawEditor.isModified())
-        {
-            try{
-                response = HttpResponse.httpResponse(ByteArray.byteArray(hexToBytes(rawEditor.getContents().toString())));
-            } catch (Exception e) {
-
-                response = requestResponse.response();
+        if (rawEditor.isModified() || dirtyCheck) {
+            try {
+                byte[] bytes = hexToBytes(rawEditor.getContents().toString());
+                return HttpResponse.httpResponse(ByteArray.byteArray(bytes));
+            } catch (Exception ex) {
+                api.logging().logToError("Invalid hex in editor: " + ex);
+                return (editedResponse != null) ? editedResponse : requestResponse.response();
             }
-        }else
-        {
-            response = requestResponse.response();
         }
-
-
-        return response;
+        return (editedResponse != null) ? editedResponse : requestResponse.response();
     }
 
     @Override
     public void setRequestResponse(HttpRequestResponse httpRequestResponse) {
         this.requestResponse = httpRequestResponse;
+        this.editedRequest = null;        // important: avoid stale carry-over
+        this.editedResponse = null;
+        dirtyCheck=false;
         refreshEditor();
     }
 
@@ -150,20 +209,141 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
 
     @Override
     public boolean isModified() {
-        return rawEditor.isModified();
+        return dirtyCheck || rawEditor.isModified();
     }
 
+
+
+
+
+    private void save() {
+        byte[] bytes;
+        try {
+            bytes = hexToBytes(rawEditor.getContents().toString());
+        } catch (Exception ex) {
+            api.logging().logToError("Reload failed - invalid hex: " + ex);
+            return;
+        }
+
+        // Cache for getRequest()/getResponse()
+        if (rawHexlerHttpEditorProvider.isRequestMode()) {
+            editedRequest = HttpRequest.httpRequest(ByteArray.byteArray(bytes));
+        } else {
+            editedResponse = HttpResponse.httpResponse(ByteArray.byteArray(bytes));
+        }
+        dirtyCheck = true;
+
+    }
+
+    private void hexFileToClipboard(File file) {
+        // 0) Read file -> hex text
+        //final String hexFile;
+        final String hexFileSearch;
+        try {
+            //hexFile=bytesToHex(Files.readAllBytes(file.toPath()));
+            hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()));
+        } catch (IOException ex) {
+            api.logging().logToError("read file failed: " + ex);
+            return;
+        }
+
+
+        ClipboardUtility.copyToClipboard(hexFileSearch);
+        rawEditor.setSearchExpression(hexFileSearch);
+
+        dirtyCheck = true;
+    }
+
+    private void pasteHex() {
+
+        String hexFile=ClipboardUtility.getClipboardText();
+        // 1) Current editor text AS-IS (already hex text)
+        String currentHex = rawEditor.getContents().toString();
+
+        // 2) Caret returned by RawEditor is a byte offset into the SAME text you gave it.
+        int caret = rawEditor.caretPosition();
+        if (caret < 0) caret = 0;
+        int insertAt = Math.min(caret, currentHex.length());
+
+        // 3) Insert
+        String newHex = new StringBuilder(currentHex)
+                .insert(insertAt, hexFile)
+                .toString();
+
+        // 4) Push HEX TEXT back
+        rawEditor.setContents(ByteArray.byteArray(newHex));
+
+
+        this.save();
+        this.refreshEditor();
+    }
+
+    private void addFileFromPath(File file) {
+        // 0) Read file -> hex text
+        final String hexFile;
+        final String hexFileSearch;
+        try {
+            hexFile = bytesToHex(Files.readAllBytes(file.toPath()));
+            hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()));
+        } catch (IOException ex) {
+            api.logging().logToError("read file failed: " + ex);
+            return;
+        }
+
+        // 1) Current editor text AS-IS (already hex text)
+        String currentHex = rawEditor.getContents().toString();
+
+        // 2) Caret returned by RawEditor is a byte offset into the SAME text you gave it.
+        int caret = rawEditor.caretPosition();
+        if (caret < 0) caret = 0;
+        int insertAt = Math.min(caret, currentHex.length());
+
+        // 3) Insert
+        String newHex = new StringBuilder(currentHex)
+                .insert(insertAt, hexFile)
+                .toString();
+
+        // 4) Push HEX TEXT back
+        rawEditor.setContents(ByteArray.byteArray(newHex));
+
+
+        // 6) Optional highlight
+        rawEditor.setSearchExpression(hexFileSearch);
+
+
+
+        this.save();
+       // rawEditor.uiComponent();
+        this.refreshEditor();
+    }
+
+
+
+
+
+
     private void refreshEditor(){
-        String hexRepresentation = "";
+        String hexRepresentation;
         if(rawHexlerHttpEditorProvider.isRequestMode()){
-            hexRepresentation = bytesToHex(requestResponse.request().toByteArray().getBytes());
+            if(dirtyCheck){
+                hexRepresentation = bytesToHex(this.editedRequest.toByteArray().getBytes());
+            }
+            else{
+                hexRepresentation = bytesToHex(requestResponse.request().toByteArray().getBytes());
+            }
         }else{
-            hexRepresentation = bytesToHex(requestResponse.response().toByteArray().getBytes());
+            if(dirtyCheck){
+                hexRepresentation = bytesToHex(this.editedResponse.toByteArray().getBytes());
+            }
+            else{
+                hexRepresentation = bytesToHex(requestResponse.response().toByteArray().getBytes());
+            }
         }
         ByteArray output = byteArray(hexRepresentation);
         this.rawEditor.setContents(output);
         this.rawEditor.uiComponent();
     }
+
 
     // Helper method to convert hex string to byte array for RawHexler formatted content
     private byte[] hexToBytes(String hexString) {
@@ -216,6 +396,17 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         return byteArray;
     }
 
+
+    private static String bytesToHexClip(byte[] data) {
+        StringBuilder sb = new StringBuilder(data.length * 3 - 1);  // “ff ” per byte
+        for (int i = 0; i < data.length; i++) {
+            sb.append(String.format("%02x", data[i]));
+            if (i < data.length - 1) sb.append(' ');
+        }
+        return sb.toString();
+    }
+
+
     // Helper method to convert byte array to hex string for RawHexler formatted content
     private String bytesToHex(byte[] bytes) {
         StringBuilder hexString = new StringBuilder();
@@ -266,3 +457,4 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         return hexString.toString();
     }
 }
+

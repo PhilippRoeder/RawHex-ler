@@ -2,6 +2,8 @@ package burp.RawHexler;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.ui.editor.extension.*;
+import java.io.File;
+
 
 public class RawHexlerHttpEditorProvider implements HttpRequestEditorProvider, HttpResponseEditorProvider {
     private final MontoyaApi api;
