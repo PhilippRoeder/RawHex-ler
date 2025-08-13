@@ -121,7 +121,7 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
                 chooser.setDialogTitle("Select a file to import");
                 chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
                 chooser.setDragEnabled(true);        // enables drag‑and‑drop
-                int result = chooser.showOpenDialog(null); // parent can be Burp’s main frame
+                int result = chooser.showOpenDialog(null);
                 if (result == JFileChooser.APPROVE_OPTION) {
                     File selected = chooser.getSelectedFile();
                     this.addFileFromPath(selected); // overload takes File
@@ -151,9 +151,8 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         if (rawEditor.isModified() || dirtyCheck) {
             try {
                 byte[] bytes = hexToBytes(rawEditor.getContents().toString());
-                // If you intend to replace the whole message, do this:
+
                 return HttpRequest.httpRequest(ByteArray.byteArray(bytes));
-                // If you only intend to replace the body, use requestResponse.request().withBody(...) instead.
             } catch (Exception ex) {
                 api.logging().logToError("Invalid hex in editor: " + ex);
                 // Fall back to last good version:
@@ -181,7 +180,7 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
     @Override
     public void setRequestResponse(HttpRequestResponse httpRequestResponse) {
         this.requestResponse = httpRequestResponse;
-        this.editedRequest = null;        // important: avoid stale carry-over
+        this.editedRequest = null;
         this.editedResponse = null;
         dirtyCheck=false;
         refreshEditor();
@@ -225,7 +224,6 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
             return;
         }
 
-        // Cache for getRequest()/getResponse()
         if (rawHexlerHttpEditorProvider.isRequestMode()) {
             editedRequest = HttpRequest.httpRequest(ByteArray.byteArray(bytes));
         } else {
@@ -313,7 +311,6 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
 
 
         this.save();
-       // rawEditor.uiComponent();
         this.refreshEditor();
     }
 
