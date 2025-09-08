@@ -106,7 +106,7 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         });
         popupMenu.add(menuItemUtf8Postfix);
 
-        refreshFormat = new JMenuItem("Reformat Editor");
+        refreshFormat = new JMenuItem("Reset");
         refreshFormat.addActionListener(e -> {
             refreshEditor();
         });
