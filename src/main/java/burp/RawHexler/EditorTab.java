@@ -12,10 +12,14 @@ public class EditorTab implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
         api.extension().setName("RawHex-ler");
-        api.logging().logToOutput("Author: SVETTERIO");
 
-        String version = loadVersion();
-        api.logging().logToOutput("Version: " + version);
+        api.logging().logToOutput("====================================================");
+        api.logging().logToOutput(" Project Information");
+        api.logging().logToOutput("====================================================");
+        api.logging().logToOutput(" Author       : Sebastian Vetter");
+        api.logging().logToOutput(" Contributors : Philipp Röder, Kartik Rastogi");
+        api.logging().logToOutput(" Version      : " + loadVersion());
+        api.logging().logToOutput("====================================================");
 
         RawHexlerRequestEditorProvider = new RawHexlerHttpEditorProvider(api);
         RawHexlerRequestEditorProvider.setSpaceDelimiters(true);
