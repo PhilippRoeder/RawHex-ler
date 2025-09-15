@@ -239,7 +239,12 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         final String hexFileSearch;
         try {
             //hexFile=bytesToHex(Files.readAllBytes(file.toPath()));
-            hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()));
+            if(rawHexlerHttpEditorProvider.isSpaceDelimiters()){
+                hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()), true);}
+            else{
+                hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()), false);
+            }
+
         } catch (IOException ex) {
             api.logging().logToError("read file failed: " + ex);
             return;
@@ -282,7 +287,11 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
         final String hexFileSearch;
         try {
             hexFile = bytesToHex(Files.readAllBytes(file.toPath()));
-            hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()));
+            if(rawHexlerHttpEditorProvider.isSpaceDelimiters()){
+                hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()), true);}
+            else{
+                hexFileSearch = bytesToHexClip(Files.readAllBytes(file.toPath()), false);
+            }
         } catch (IOException ex) {
             api.logging().logToError("read file failed: " + ex);
             return;
@@ -394,11 +403,14 @@ public class RawHexlerEntensionProvidedEditor implements ExtensionProvidedHttpRe
     }
 
 
-    private static String bytesToHexClip(byte[] data) {
+    private static String bytesToHexClip(byte[] data, boolean spaces) {
         StringBuilder sb = new StringBuilder(data.length * 3 - 1);  // “ff ” per byte
         for (int i = 0; i < data.length; i++) {
             sb.append(String.format("%02x", data[i]));
-            if (i < data.length - 1) sb.append(' ');
+            if (spaces){
+                if (i < data.length - 1) sb.append(' ');
+            }
+
         }
         return sb.toString();
     }
