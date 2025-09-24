@@ -26,8 +26,8 @@ NOTE: Changes to settings in an existing RawHex'ler tab will apply globally to a
   **Attention**: Carriage-return (`\r`) and newline (`\n`) characters are displayed as spaces in the UTF-8 postfix. This postfix data is read-only, meaning any modifications to it will not alter the actual content.
 - **Reformat Editor**: Resets the editor to the Burp hex formatting. 
    **Attention**: It does not save the current editor content in the request, you have to click save to actually save them to the request.
-- **hex-File to Clipboard**: Let'S you choose a file which will then be converted to hex, put into the clipboard and the put into search bar.
-- **Paste hex from Clipboard**: Pastes hex formatted Clipboard content at current cursor position. The editor will automatically be reformatted.
+- **hex-File to Clipboard**: Let's you choose a file which will then be converted to hex, put into the clipboard and into the search bar.
+- **Paste hex from Clipboard**: Pastes hex formatted Clipboard content at current cursor position.
 - **Paste from hex File**: Opens a Menu to select a file which will then be converted to hex and pasted at the current cursor position. The editor will automatically be reformatted.
 
 ## Screenshots:
